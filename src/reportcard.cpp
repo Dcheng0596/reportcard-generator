@@ -25,19 +25,26 @@ private:
 		std::ifstream iFile(file.c_str());
 		std::getline(iFile, record);                             //skip first line
 
-		int i = 0;
-		while (std::getline(iFile, record))
+        if(iFile.is_open())
 		{
-			std::stringstream ss(record);
-			std::string cell;
-			cells.resize(i + 1);
-			while (std::getline(ss, cell, ','))
+			int i = 0;
+			while (std::getline(iFile, record))
 			{
-				cells[i].push_back(cell);
+				std::stringstream ss(record);
+				std::string cell;
+				cells.resize(i + 1);
+				while (std::getline(ss, cell, ','))
+				{
+					cells[i].push_back(cell);
+				}
+				i++;
 			}
-			i++;
+			iFile.close();
 		}
-		iFile.close();
+		else
+		{
+			std::cerr << "Error unable to open: " << file << std::endl;
+		}
 		return cells;
 	}
 
@@ -104,57 +111,64 @@ public:
 	}
 	/*********************************************************************/
 
-	//Creates and outputs report card for all students on file
+	//Creates and outputs report card for all studnts on file
 	void createReportCard(std::string stuFile, std::string outDest)
 	{
-	    std::string destination = outDest.append("/ReportCard.txt");
+	    std::string destination = outDest;
 		std::ofstream oFile(destination.c_str());
 
-		std::vector<std::vector<std::string> > cells = readFile(stuFile);
-		for (int i = 0; i < cells.size(); i++)
+		if(oFile.is_open())
 		{
-			int studentId = std::stoi(cells[i][0]);
-			if (marks.find(studentId) == marks.end())
+			std::vector<std::vector<std::string> > cells = readFile(stuFile);
+			for (int i = 0; i < cells.size(); i++)
 			{
-				std::cerr << "Student Id: " << studentId << " has not taken any courses" << std::endl;
-				break;
+				int studentId = std::stoi(cells[i][0]);
+				if (marks.find(studentId) == marks.end())
+				{
+					std::cerr << "Student Id: " << studentId << " has not taken any courses" << std::endl;
+					break;
+				}
+
+				std::string name = cells[i][1];
+				std::map<int, double> courseGrades = calcCourseGrades(studentId);
+				double totalAvg = std::accumulate(courseGrades.begin(), courseGrades.end(), 0.0,
+					[](double total, std::pair<int, double> grade) { return total + grade.second; }) / courseGrades.size();
+
+				oFile << std::fixed;
+				oFile << std::setprecision(2);
+				oFile << "Student Id: " << studentId << ", name: " << name << std::endl;
+				oFile << "Total Average:\t" << totalAvg << "%\n" << std::endl;
+
+				std::map<int, double>::iterator it;
+				for (it = courseGrades.begin(); it != courseGrades.end(); it++)
+				{
+					int courseId = it->first;
+					double finalGrade = it->second;
+					oFile << "\tCourse: " << courses[courseId].first << ", Teacher " << courses[courseId].second << std::endl;
+					oFile << "\tFinal Grade:  " << finalGrade << "% \n" << std::endl;
+				}
+				oFile << std::endl;
 			}
-
-			std::string name = cells[i][1];
-			std::map<int, double> courseGrades = calcCourseGrades(studentId);
-			double totalAvg = std::accumulate(courseGrades.begin(), courseGrades.end(), 0.0,
-				[](double total, std::pair<int, double> grade) { return total + grade.second; }) / courseGrades.size();
-
-			oFile << std::fixed;
-			oFile << std::setprecision(2);
-			oFile << "Student Id: " << studentId << ", name: " << name << std::endl;
-			oFile << "Total Average:\t" << totalAvg << "%\n" << std::endl;
-
-			std::map<int, double>::iterator it;
-			for (it = courseGrades.begin(); it != courseGrades.end(); it++)
-			{
-				int courseId = it->first;
-				double finalGrade = it->second;
-				oFile << "\tCourse: " << courses[courseId].first << ", Teacher " << courses[courseId].second << std::endl;
-				oFile << "\tFinal Grade:  " << finalGrade << "% \n" << std::endl;
-			}
-			oFile << std::endl;
+			oFile.close();
 		}
-		oFile.close();
-		std::cout << "Success!";
+		else
+		{
+			std::cerr << "Error unable to open: " << outDest << std::endl;
+		}
+		
 	}
 };
 
-int main()
+int main(int argc, char *argv[])
 {
 	std::string coursesFile = "courses.csv";
 	std::string marksFile = "marks.csv";
 	std::string testsFile = "tests.csv";
 	std::string studentsFile = "students.csv";
-	std::string destination = "";
+	
+    if(argc == 1)
+	    ReportCard card(coursesFile, marksFile, testsFile, studentsFile, "report-card");
+	else if(argc == 2)
+	    ReportCard card(coursesFile, marksFile, testsFile, studentsFile, argv[1]);
 
-	std::cout << "Enter folder destination path: ";
-	std::cin >> destination;
-
-	ReportCard card(coursesFile, marksFile, testsFile, studentsFile, destination);
 }
